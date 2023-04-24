@@ -7,11 +7,13 @@ public class Main {
 
 
     public static void main(String[] args) {
-        if(args.length > 0) {
+        Sha_3 sha = new Sha_3();
+        if(args.length > 1) {
             mapArgs(new ArrayList<String>(List.of(args)));
             handleCommandLineArgs();
         } else {
             handleCommandLineInput();
+            System.out.println(sha.encrypt(args[0]));
         }
     }
 
