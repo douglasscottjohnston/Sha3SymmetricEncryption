@@ -1,51 +1,116 @@
 import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.*;
 
 public class Main {
-    private static File file;
-    private static Map<String, Object> argMap = Map.of("-f", false, "-tag", false, "-hash", false, "-encrypt", false, "-decrypt", false);
+    private static Sha_3 mySha = new Sha_3();
+
+    private static ArrayList<String> flags = new ArrayList<>(List.of(new String[]{"-H", "-T", "-S"}));
+    private static ArrayList<String> options = new ArrayList<>(List.of(new String[]{"H", "T", "S", "Q"}));
+    private static final String OUTPUT_FILE_NAME = "output.txt";
 
 
     public static void main(String[] args) {
-        Sha_3 sha = new Sha_3();
-        if(args.length > 1) {
-            mapArgs(new ArrayList<String>(List.of(args)));
-            handleCommandLineArgs();
+        if (args.length > 0) {
+            handleCommandLineArgs(args);
         } else {
             handleCommandLineInput();
-            System.out.println(sha.encrypt(args[0]));
         }
+        System.out.println();
     }
 
-    private static void mapArgs(ArrayList<String> args) {
-        String startFlag = args.get(0);
-        if(args.size() == 1) { //the start flag is the file path
-            argMap.put("-f", startFlag);
-            return;
+    private static void handleCommandLineArgs(String[] args) {
+        File inputFile = new File(args[0]);
+        File outputFile = new File(OUTPUT_FILE_NAME);
+        String flag = "-H";
+        String passphrase = null;
+
+        if (args.length > 1) {
+            flag = args[1];
         }
 
-        for (String arg : args) {
-            if(argMap.containsKey(arg) && (argMap.containsKey(args.get(args.indexOf(arg) + 1).toLowerCase())
-                    || args.indexOf(arg) == args.size() - 1)) { //boolean flag
-                argMap.replace(arg, true);
-            } else if(argMap.containsKey(arg)) { //string input
-                argMap.replace(arg, args.get(args.indexOf(arg) + 1));
-            }
+        if (args.length > 2) {
+            passphrase = args[2];
         }
-    }
 
-    private static void handleCommandLineArgs() {
-        for (Map.Entry<String, Object> entry : argMap.entrySet()) {
-            switch (entry.getKey()) {
-                case "-f", "-F":
-                    file = new File((String)entry.getValue());
-                case "-at":
+        try {
+            FileWriter fileWriter = new FileWriter(outputFile);
 
+            if (!flags.contains(flag)) {
+                throw new IllegalArgumentException("These are the only accepted flags: " + flags);
             }
+
+            if (flag.equals("-H")) {
+                fileWriter.write(mySha.hash(inputFile));
+            } else if (passphrase == null) {
+                throw new IllegalArgumentException(flag + " was called with no passphrase provided");
+            } else {
+                if (flag.equals("-T")) {
+                    fileWriter.write("Authentication tag: ");
+                    fileWriter.write(mySha.authenticationTag(inputFile, passphrase));
+                    fileWriter.write("\n");
+                    fileWriter.write("Passphrase: ");
+                    fileWriter.write(passphrase);
+                } else {
+                    fileWriter.write("Encrypted: ");
+                    SymmetricCryptogram encrpyted = mySha.encrypt(inputFile, passphrase);
+                    fileWriter.write(encrpyted.toString());
+                    fileWriter.write("\n");
+                    fileWriter.write("Decrpyted: ");
+                    fileWriter.write(mySha.decrypt(encrpyted, passphrase));
+                    fileWriter.write("\n");
+                    fileWriter.write("Passphrase: ");
+                    fileWriter.write(passphrase);
+                }
+            }
+            fileWriter.close();
+        } catch (IOException e) {
+            System.out.println("output file not found");
+            e.printStackTrace();
         }
     }
 
     private static void handleCommandLineInput() {
+        boolean running = true;
+        Scanner scanner = new Scanner(System.in);
+        while (running) {
 
+            System.out.println("Type 'H' for cryptographic hash, 'T' for authentication tag, 'S' to symmetrically encrypt, or Q to quit");
+            String option = scanner.nextLine();
+
+            if (!options.contains(option)) {
+                System.out.println("You must type one of these options:" + options);
+                continue;
+            }
+
+            if (option.equals("Q")) {
+                running = false;
+                continue;
+            }
+
+            System.out.println("Enter the data to hash:");
+            String data = scanner.nextLine();
+
+            if (option.equals("H")) {
+                System.out.println("The hashed data:");
+                System.out.println(mySha.hash(data));
+            } else {
+                System.out.println("Enter the passphrase:");
+                String passphrase = scanner.nextLine();
+
+                if (option.equals("T")) {
+                    System.out.println("The authentication tag:");
+                    System.out.println(mySha.authenticationTag(data, passphrase));
+                } else {
+                    System.out.println("The symmetrically encrypted data:");
+                    SymmetricCryptogram encrypted = mySha.encrypt(data, passphrase);
+                    System.out.println(encrypted);
+                    System.out.println("The decrypted data:");
+                    System.out.println(mySha.decrypt(encrypted, passphrase));
+                }
+            }
+            System.out.println();
+        }
     }
 }

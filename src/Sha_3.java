@@ -1,13 +1,26 @@
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
 import java.math.BigInteger;
-import java.nio.ByteBuffer;
-import java.util.BitSet;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.security.SecureRandom;
+import java.util.Arrays;
 
 public class Sha_3 {
 
-    private static final int SIZE = 16; // The number of bytes in 256 bits
-    private static final BitSet ZERO = BitSet.valueOf(new long[]{0});
-    private static final BitSet TWO_FIFTY_FIVE = BitSet.valueOf(new long[]{255});
+    public static final byte[] ZERO_RIGHT_ENCODED = {(byte) 0x00, (byte) 0x01};
+    public static final byte[] ZERO_LEFT_ENCODED = {(byte) 0X01, (byte) 0x00};
+
+    private static final byte[] EMPTY_STRING_BYTES = ("").getBytes();
+    private static final byte[] D_BYTES = ("D").getBytes();
+    private static final byte[] T_BYTES = ("T").getBytes();
+    private static final byte[] S_BYTES = ("S").getBytes();
+    private static final byte[] SKE_BYTES = ("SKE").getBytes();
+    private static final byte[] SKA_BYTES = ("SKA").getBytes();
+    private static final int FIVE_TWELVE = 512;
+    private static final int TEN_TWENTYFOUR = 1024;
+    private static final int REQUIRED_BYTE_MULTIPLE = 8;
 
     private static final int ROUNDS = 24;
 
@@ -32,64 +45,142 @@ public class Sha_3 {
             15, 23, 19, 13, 12, 2, 20, 14, 22, 9, 6, 1
     };
 
+    private static SecureRandom myRandom = new SecureRandom();
+
     Sha_3() {
 
     }
 
-    public static void encrypt(File file) {
-
+    public static String hash(File theFile) {
+        try {
+            return hash(new String(Files.readAllBytes(Paths.get(theFile.getPath()))));
+        } catch(IOException e) {
+            e.printStackTrace();
+            return "";
+        }
     }
 
-    public static String encrypt(String string) {
-        byte[] output = encodeString(string);
-
-        return output.toString();
+    public static String hash(String theString) {
+        byte[] thePaddedString = padBytes(theString.getBytes());
+        return new String(KMACXOF256(EMPTY_STRING_BYTES, thePaddedString, FIVE_TWELVE, D_BYTES));
     }
 
-    public static void decrypt(File file, BitSet key) {
-
+    public static String authenticationTag(File theFile, String pw) {
+        try {
+            return authenticationTag(new String(Files.readAllBytes(Paths.get(theFile.getPath()))), pw);
+        } catch(IOException e) {
+            e.printStackTrace();
+            return "";
+        }
     }
 
-    public static String decrypt(String string, BitSet key) {
-
-        return string;
+    public static String authenticationTag(String theString, String pw) {
+        byte[] thePaddedString = padBytes(theString.getBytes());
+        return new String(KMACXOF256(pw.getBytes(), thePaddedString, FIVE_TWELVE, T_BYTES));
     }
 
-    private static byte[] bytepad(byte[] X, int w) {
+    public static SymmetricCryptogram encrypt(File theFile, String pw) {
+        try {
+            return encrypt(new String(Files.readAllBytes(Paths.get(theFile.getPath()))), pw);
+        } catch(IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public static SymmetricCryptogram encrypt(String theString, String pw) {
+        byte[] z = new byte[FIVE_TWELVE];
+        myRandom.nextBytes(z);
+
+        byte[] thePaddedString = padBytes(theString.getBytes());
+
+        byte[] keka = KMACXOF256(append(z, pw.getBytes()), EMPTY_STRING_BYTES, TEN_TWENTYFOUR, S_BYTES);
+        byte[] ke = Arrays.copyOfRange(keka, 0, keka.length / 2);
+        byte[] ka = Arrays.copyOfRange(keka, keka.length / 2, keka.length);
+        byte[] c = (new BigInteger(KMACXOF256(ke, EMPTY_STRING_BYTES, thePaddedString.length, SKE_BYTES)).xor(new BigInteger(thePaddedString))).toByteArray();
+        byte[] t = KMACXOF256(ka, thePaddedString, FIVE_TWELVE, SKA_BYTES);
+        return new SymmetricCryptogram(z, c, t);
+    }
+
+    public static String decrypt(SymmetricCryptogram theCryptogram, String pw) {
+        byte[] keka = KMACXOF256(append(theCryptogram.getZ(), pw.getBytes()), EMPTY_STRING_BYTES, TEN_TWENTYFOUR, S_BYTES);
+        byte[] ke = Arrays.copyOfRange(keka, 0, keka.length / 2);
+        byte[] ka = Arrays.copyOfRange(keka, keka.length / 2, keka.length);
+        byte[] m = (new BigInteger(KMACXOF256(ke, EMPTY_STRING_BYTES, theCryptogram.getC().length, SKE_BYTES)).xor(new BigInteger(theCryptogram.getC()))).toByteArray();
+        byte[] t = KMACXOF256(ka, m, FIVE_TWELVE, SKA_BYTES);
+        return Arrays.equals(t, theCryptogram.getT()) ? new String(m).replaceAll("\0", "") : "UNACCEPTED";
+    }
+
+    private static byte[] cSHAKE256(byte[] X, int L, byte[] N, byte[] S) {
+        if ((L & 7) != 0) {
+            throw new IllegalArgumentException("SHAKE mandates that the output length must be a multiple of 8");
+        }
+
+        byte[] outputBytes = new byte[L >>> 3];
+        SHAKE shake = new SHAKE();
+        shake.customize(N, S);
+        shake.absorb(X, X.length);
+        shake.changeMode();
+        shake.squeeze(outputBytes, L >>> 3);
+        return outputBytes;
+    }
+
+    private static byte[] KMACXOF256(byte[] K, byte[] X, int L, byte[] S) {
+        byte[] newX = append(append(bytepad(encodeString(K), 136), X), rightEncode(L));
+        return cSHAKE256(newX, L, SHAKE.KMAC_IN_BYTES, S);
+    }
+
+    public static byte[] bytepad(byte[] X, int w) {
         byte[] encoding = leftEncode(w);
         byte[] z = new byte[w * ((encoding.length + X.length + w - 1) / w)]; // as per the sha3 documentation
         System.arraycopy(encoding, 0, z, 0, encoding.length);
-        for (int i = en; i < ; i++) {
-
+        System.arraycopy(X, 0, z, encoding.length, X.length);
+        for (int i = encoding.length; i < z.length; i++) {
+            z[i] = (byte) 0;
         }
 
         return z;
     }
 
-    private static byte[] encodeString(String s) {
-        byte[] output = bytepad(s.getBytes(), s.length());
+    public static byte[] encodeString(byte[] theString) {
+        int theStringLength = (theString == null) ? 0 : theString.length;
 
-
-        return output;
+        byte[] lengthEncoding = (theString == null) ? ZERO_LEFT_ENCODED : leftEncode(theStringLength << 3);
+        byte[] theStringEncoding = new byte[lengthEncoding.length + theStringLength];
+        System.arraycopy(lengthEncoding, 0, theStringEncoding, 0, lengthEncoding.length);
+        System.arraycopy((theString == null) ? theStringEncoding : theString, 0, theStringEncoding, lengthEncoding.length, theStringLength);
+        return theStringEncoding;
     }
 
     private static byte[] leftEncode(int x) {
-        byte[] bytes = ByteBuffer.allocate(SIZE).putInt(x).array();
-        bytes = reverse(bytes);
-        bytes[0] = 1;
-        print(bytes);
-        System.out.println(bytes[3]);
-        return bytes;
+        int n = 1;
+        while ((1 << (8 * n)) <= x) {
+            n++;
+        }
+
+        byte[] xEncoding = new byte[n + 1];
+        for (int i = n; i > 0; i--) {
+            xEncoding[i] = (byte) (x & 0xFF);
+            x >>>= 8;
+        }
+
+        xEncoding[0] = (byte) n;
+        return xEncoding;
     }
 
     private static byte[] rightEncode(int x) {
-        byte[] bytes = ByteBuffer.allocate(SIZE).putInt(x).array();
-        bytes = reverse(bytes);
-        bytes[SIZE - 1] = 1;
-        print(bytes);
+        int n = 1;
+        while ((1 << (8 * n)) <= x) {
+            n++;
+        }
 
-
-        return bytes;
+        byte[] xEncoding = new byte[n + 1];
+        for (int i = 0; i < n - 1; i++) {
+            xEncoding[i] = (byte) (x & 0xFF);
+            x >>>= 8;
+        }
+        xEncoding[n] = (byte) n;
+        return xEncoding;
     }
 
     private static long rotateLeft(long theValue, int thePositions) {
@@ -162,16 +253,35 @@ public class Sha_3 {
         return theState;
     }
 
-    private static byte[] reverse(byte[] bits) {
-        byte[] reversed = new byte[bits.length];
-
-        int j = 0;
-        for (int i = bits.length - 1; i > -1; i--) {
-            reversed[j] = bits[i];
-            j++;
+    public static byte[] append(byte[] theHost, byte[] theBytesToAppend) {
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            baos.write(theHost);
+            baos.write(theBytesToAppend);
+            return baos.toByteArray();
+        } catch(IOException e) {
+            e.printStackTrace();
+            return null;
         }
+    }
 
-        return reversed;
+    public static byte[] append(byte[] theHost, byte theByteToAppend) {
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            baos.write(theHost);
+            baos.write(theByteToAppend);
+            return baos.toByteArray();
+        } catch(IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private static byte[] padBytes(byte[] theBytes) {
+        while(theBytes.length % REQUIRED_BYTE_MULTIPLE != 0) {
+            theBytes = append(theBytes, (byte)0);
+        }
+        return theBytes;
     }
 
 
