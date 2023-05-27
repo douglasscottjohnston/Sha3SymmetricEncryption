@@ -6,7 +6,17 @@ import java.util.*;
 public class Main {
     private static Sha_3 mySha = new Sha_3();
 
-    private static ArrayList<String> flags = new ArrayList<>(List.of(new String[]{"-H", "-T", "-S"}));
+    /**
+     * -H: Computes a plain cryptographic hash of the given file and writes it to output.txt (A passphrase is not required for this flag to work)
+     * -T: Computes an authentication tag of the given file and writes it to output.txt (A passphrase is REQUIRED to be entered after the flag for this to work)
+     * -S: Does symmetric encryption and decryption of the given file and writes it to output.txt (A passphrase is REQUIRED to be entered after the flag for this to work)
+     * -KP: Generate an elliptic key pair from a given passphrase and write the public key to a file.
+     * -PKF: Encrypt a data file under a given elliptic public key file and write the ciphertext to a file.
+     * -EE: Decrypt a given elliptic-encrypted file from a given password and write the decrypted data to a file.
+     * -SF: Sign a given file from a given password and write the signature to a file.
+     * -V: Verify a given data file and its signature file under a given public key file.
+     */
+    private static ArrayList<String> flags = new ArrayList<>(List.of(new String[]{"-H", "-T", "-S", "-KP", "-PKF", "-EE", "-SF", "-V"}));
     private static ArrayList<String> options = new ArrayList<>(List.of(new String[]{"H", "T", "S", "Q"}));
     private static final String OUTPUT_FILE_NAME = "output.txt";
 
@@ -43,26 +53,56 @@ public class Main {
 
             if (flag.equals("-H")) {
                 fileWriter.write(mySha.hash(inputFile));
+            } else if (passphrase == null && flag.equals("-PKF")) {
+                throw new IllegalArgumentException(flag + " was called with no public key file provided");
             } else if (passphrase == null) {
                 throw new IllegalArgumentException(flag + " was called with no passphrase provided");
             } else {
-                if (flag.equals("-T")) {
-                    fileWriter.write("Authentication tag: ");
-                    fileWriter.write(mySha.authenticationTag(inputFile, passphrase));
-                    fileWriter.write("\n");
-                    fileWriter.write("Passphrase: ");
-                    fileWriter.write(passphrase);
-                } else {
-                    fileWriter.write("Encrypted: ");
-                    SymmetricCryptogram encrpyted = mySha.encrypt(inputFile, passphrase);
-                    fileWriter.write(encrpyted.toString());
-                    fileWriter.write("\n");
-                    fileWriter.write("Decrpyted: ");
-                    fileWriter.write(mySha.decrypt(encrpyted, passphrase));
-                    fileWriter.write("\n");
-                    fileWriter.write("Passphrase: ");
-                    fileWriter.write(passphrase);
+                switch (flag) {
+                    case "-T":
+                        fileWriter.write("Authentication tag: ");
+                        fileWriter.write(mySha.authenticationTag(inputFile, passphrase));
+                        fileWriter.write("\n");
+                        fileWriter.write("Passphrase: ");
+                        fileWriter.write(passphrase);
+                    case "-S":
+                        fileWriter.write("Encrypted: ");
+                        SymmetricCryptogram encrpyted = mySha.encrypt(inputFile, passphrase);
+                        fileWriter.write(encrpyted.toString());
+                        fileWriter.write("\n");
+                        fileWriter.write("Decrpyted: ");
+                        fileWriter.write(mySha.decrypt(encrpyted, passphrase));
+                        fileWriter.write("\n");
+                        fileWriter.write("Passphrase: ");
+                        fileWriter.write(passphrase);
+                    case "-KP":
+                        System.out.println(flag);
+                    case "-PKF":
+                        System.out.println(flag);
+                    case "-EE":
+                        System.out.println(flag);
+                    case "-SF":
+                        System.out.println(flag);
+                    case "-V":
+                        System.out.println(flag);
                 }
+//                if (flag.equals("-T")) {
+//                    fileWriter.write("Authentication tag: ");
+//                    fileWriter.write(mySha.authenticationTag(inputFile, passphrase));
+//                    fileWriter.write("\n");
+//                    fileWriter.write("Passphrase: ");
+//                    fileWriter.write(passphrase);
+//                } else if (flag.equals("-s")) {
+//                    fileWriter.write("Encrypted: ");
+//                    SymmetricCryptogram encrpyted = mySha.encrypt(inputFile, passphrase);
+//                    fileWriter.write(encrpyted.toString());
+//                    fileWriter.write("\n");
+//                    fileWriter.write("Decrpyted: ");
+//                    fileWriter.write(mySha.decrypt(encrpyted, passphrase));
+//                    fileWriter.write("\n");
+//                    fileWriter.write("Passphrase: ");
+//                    fileWriter.write(passphrase);
+//                }
             }
             fileWriter.close();
         } catch (IOException e) {
