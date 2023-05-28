@@ -17,7 +17,7 @@ public class Main {
      * -V: Verify a given data file and its signature file under a given public key file.
      */
     private static ArrayList<String> flags = new ArrayList<>(List.of(new String[]{"-H", "-T", "-S", "-KP", "-PKF", "-EE", "-SF", "-V"}));
-    private static ArrayList<String> options = new ArrayList<>(List.of(new String[]{"H", "T", "S", "Q"}));
+    private static ArrayList<String> options = new ArrayList<>(List.of(new String[]{"H", "T", "S", "PKF", "SF", "Q"}));
     private static final String OUTPUT_FILE_NAME = "output.txt";
 
 
@@ -59,32 +59,32 @@ public class Main {
                 throw new IllegalArgumentException(flag + " was called with no passphrase provided");
             } else {
                 switch (flag) {
-                    case "-T":
-                        fileWriter.write("Authentication tag: ");
-                        fileWriter.write(mySha.authenticationTag(inputFile, passphrase));
-                        fileWriter.write("\n");
-                        fileWriter.write("Passphrase: ");
-                        fileWriter.write(passphrase);
-                    case "-S":
-                        fileWriter.write("Encrypted: ");
-                        SymmetricCryptogram encrpyted = mySha.encrypt(inputFile, passphrase);
-                        fileWriter.write(encrpyted.toString());
-                        fileWriter.write("\n");
-                        fileWriter.write("Decrpyted: ");
-                        fileWriter.write(mySha.decrypt(encrpyted, passphrase));
-                        fileWriter.write("\n");
-                        fileWriter.write("Passphrase: ");
-                        fileWriter.write(passphrase);
-                    case "-KP":
-                        System.out.println(flag);
-                    case "-PKF":
-                        System.out.println(flag);
-                    case "-EE":
-                        System.out.println(flag);
-                    case "-SF":
-                        System.out.println(flag);
-                    case "-V":
-                        System.out.println(flag);
+                case "-T":
+                    fileWriter.write("Authentication tag: ");
+                    fileWriter.write(mySha.authenticationTag(inputFile, passphrase));
+                    fileWriter.write("\n");
+                    fileWriter.write("Passphrase: ");
+                    fileWriter.write(passphrase);
+                case "-S":
+                    fileWriter.write("Encrypted: ");
+                    SymmetricCryptogram encrpyted = mySha.encrypt(inputFile, passphrase);
+                    fileWriter.write(encrpyted.toString());
+                    fileWriter.write("\n");
+                    fileWriter.write("Decrpyted: ");
+                    fileWriter.write(mySha.decrypt(encrpyted, passphrase));
+                    fileWriter.write("\n");
+                    fileWriter.write("Passphrase: ");
+                    fileWriter.write(passphrase);
+                case "-KP":
+                    System.out.println(flag);
+                case "-PKF":
+                    System.out.println(flag);
+                case "-EE":
+                    System.out.println(flag);
+                case "-SF":
+                    System.out.println(flag);
+                case "-V":
+                    System.out.println(flag);
                 }
 //                if (flag.equals("-T")) {
 //                    fileWriter.write("Authentication tag: ");
@@ -115,8 +115,10 @@ public class Main {
         boolean running = true;
         Scanner scanner = new Scanner(System.in);
         while (running) {
+            //"H", "T", "S", "PKF", "SF", "Q"
 
-            System.out.println("Type 'H' for cryptographic hash, 'T' for authentication tag, 'S' to symmetrically encrypt, or Q to quit");
+            System.out.println("Type 'H' for cryptographic hash, 'T' for authentication tag, 'S' to symmetrically encrypt, " +
+                    "PKF to encrypt a data file under a given elliptic public key file, SF to sign a file, or Q to quit");
             String option = scanner.nextLine();
 
             if (!options.contains(option)) {
@@ -124,33 +126,62 @@ public class Main {
                 continue;
             }
 
+            ArrayList<String> part1Options = new ArrayList<>(List.of(new String[]{"H", "T", "S"}));
             if (option.equals("Q")) {
                 running = false;
-                continue;
-            }
-
-            System.out.println("Enter the data to hash:");
-            String data = scanner.nextLine();
-
-            if (option.equals("H")) {
-                System.out.println("The hashed data:");
-                System.out.println(mySha.hash(data));
+            } else if (part1Options.contains(option)) {
+                handlePart1Commands(scanner, option);
             } else {
-                System.out.println("Enter the passphrase:");
-                String passphrase = scanner.nextLine();
-
-                if (option.equals("T")) {
-                    System.out.println("The authentication tag:");
-                    System.out.println(mySha.authenticationTag(data, passphrase));
-                } else {
-                    System.out.println("The symmetrically encrypted data:");
-                    SymmetricCryptogram encrypted = mySha.encrypt(data, passphrase);
-                    System.out.println(encrypted);
-                    System.out.println("The decrypted data:");
-                    System.out.println(mySha.decrypt(encrypted, passphrase));
-                }
+                handlePart2Commands(scanner, option);
             }
-            System.out.println();
+        }
+    }
+
+    private static void handlePart1Commands(Scanner scanner, String option) {
+        System.out.println("Enter the data to hash:");
+        String data = scanner.nextLine();
+
+        if (option.equals("H")) {
+            System.out.println("The hashed data:");
+            System.out.println(mySha.hash(data));
+        } else {
+            System.out.println("Enter the passphrase:");
+            String passphrase = scanner.nextLine();
+
+            if (option.equals("T")) {
+                System.out.println("The authentication tag:");
+                System.out.println(mySha.authenticationTag(data, passphrase));
+            } else {
+                System.out.println("The symmetrically encrypted data:");
+                SymmetricCryptogram encrypted = mySha.encrypt(data, passphrase);
+                System.out.println(encrypted);
+                System.out.println("The decrypted data:");
+                System.out.println(mySha.decrypt(encrypted, passphrase));
+            }
+        }
+        System.out.println();
+    }
+
+    private static void handlePart2Commands(Scanner scanner, String option) {
+        String data;
+        switch (option) {
+        case "KP":
+            System.out.println("Enter the passphrase: ");
+            String passphrase = scanner.nextLine();
+            System.out.println("The public key: ");
+            //TODO: print the public key
+        case "PKF":
+            System.out.println("Enter full filepath to the elliptic public key: ");
+            File publicKeyFile = new File(scanner.nextLine());
+            System.out.println("Enter the data to encrypt: ");
+            data = scanner.nextLine();
+            //TODO: encrypt the data
+        case "SF":
+            System.out.println("Enter the password: ");
+            String password = scanner.nextLine();
+            System.out.println("Enter the data to sign: ");
+            data = scanner.nextLine();
+            //TODO: sign the data
         }
     }
 }
