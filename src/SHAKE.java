@@ -1,4 +1,3 @@
-import java.io.IOException;
 import java.util.Arrays;
 
 public class SHAKE {
@@ -8,14 +7,11 @@ public class SHAKE {
     private static final int r = 136; // 8 bits per byte * 136 = 1088 bits for r, as determined by Keccack
     private byte[] myState = new byte[200]; // 8 bits per byte * 200 = 1600 bits for the state, as determined by Keccack
 
-    private Sha_3 mySha;
     private int myCount = 0;
     private boolean isMacKey;
     private boolean isCShake;
 
-    SHAKE() {
-        mySha = new Sha_3();
-    }
+    SHAKE() {}
 
     public void customize(byte[] N, byte[] S) {
         if ((N == null || N.length == 0) && (S == null || S.length == 0))
@@ -23,7 +19,7 @@ public class SHAKE {
 
         isMacKey = Arrays.equals(N, KMAC_IN_BYTES);
 
-        byte[] customization = mySha.bytepad(mySha.append(mySha.encodeString(N), mySha.encodeString(S)), 136);
+        byte[] customization = Sha_3.bytepad(Sha_3.append(Sha_3.encodeString(N), Sha_3.encodeString(S)), 136);
 
         absorb(customization, customization.length);
 
@@ -39,7 +35,7 @@ public class SHAKE {
         for (int i = 0; i < theLength; i++) {
             myState[j++] ^= theData[i];
             if (j >= r) {
-                myState = mySha.KECCAKF(myState);
+                myState = Sha_3.KECCAKF(myState);
                 j = 0;
             }
         }
@@ -47,12 +43,12 @@ public class SHAKE {
 
     public void changeMode() {
         if (isMacKey) {
-            absorb(mySha.ZERO_RIGHT_ENCODED, mySha.ZERO_RIGHT_ENCODED.length);
+            absorb(Sha_3.ZERO_RIGHT_ENCODED, Sha_3.ZERO_RIGHT_ENCODED.length);
         }
 
         myState[myCount] ^= (byte) (isCShake ? 0x04 : 0x1F);
         myState[r - 1] ^= (byte) 0x80;
-        myState = mySha.KECCAKF(myState);
+        myState = Sha_3.KECCAKF(myState);
         myCount = 0;
     }
 
@@ -60,7 +56,7 @@ public class SHAKE {
         int j = myCount;
         for (int i = 0; i < theLength; i++) {
             if (j >= r) {
-                myState = mySha.KECCAKF(myState);
+                myState = Sha_3.KECCAKF(myState);
                 j = 0;
             }
             theData[i] = myState[j++];

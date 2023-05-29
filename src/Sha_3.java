@@ -15,12 +15,21 @@ public class Sha_3 {
     private static final byte[] EMPTY_STRING_BYTES = ("").getBytes();
     private static final byte[] D_BYTES = ("D").getBytes();
     private static final byte[] T_BYTES = ("T").getBytes();
+    private static final byte[] N_BYTES = ("N").getBytes();
     private static final byte[] S_BYTES = ("S").getBytes();
     private static final byte[] SKE_BYTES = ("SKE").getBytes();
     private static final byte[] SKA_BYTES = ("SKA").getBytes();
+    private static final byte[] SK_BYTES = ("SK").getBytes();
+    private static final byte[] PK_BYTES = ("PK").getBytes();
+    private static final byte[] PKE_BYTES = ("PKE").getBytes();
+    private static final byte[] PKA_BYTES = ("PKA").getBytes();
     private static final int FIVE_TWELVE = 512;
     private static final int TEN_TWENTYFOUR = 1024;
     private static final int REQUIRED_BYTE_MULTIPLE = 8;
+    private static final BigInteger FOUR = BigInteger.valueOf(4);
+    private static final BigInteger r = BigInteger.TWO.pow(446).subtract(new BigInteger(
+            "13818066809895115352007386748515426880336692474882178609894547503885"
+    ));
 
     private static final int ROUNDS = 24;
 
@@ -45,7 +54,8 @@ public class Sha_3 {
             15, 23, 19, 13, 12, 2, 20, 14, 22, 9, 6, 1
     };
 
-    private static SecureRandom myRandom = new SecureRandom();
+    private static final SecureRandom myRandom = new SecureRandom();
+    private static final Point G = Point.fromLeastSignificantBit(BigInteger.valueOf(8));
 
     Sha_3() {
 
@@ -54,7 +64,7 @@ public class Sha_3 {
     public static String hash(File theFile) {
         try {
             return hash(new String(Files.readAllBytes(Paths.get(theFile.getPath()))));
-        } catch(IOException e) {
+        } catch (IOException e) {
             e.printStackTrace();
             return "";
         }
@@ -68,7 +78,7 @@ public class Sha_3 {
     public static String authenticationTag(File theFile, String pw) {
         try {
             return authenticationTag(new String(Files.readAllBytes(Paths.get(theFile.getPath()))), pw);
-        } catch(IOException e) {
+        } catch (IOException e) {
             e.printStackTrace();
             return "";
         }
@@ -82,7 +92,7 @@ public class Sha_3 {
     public static SymmetricCryptogram encrypt(File theFile, String pw) {
         try {
             return encrypt(new String(Files.readAllBytes(Paths.get(theFile.getPath()))), pw);
-        } catch(IOException e) {
+        } catch (IOException e) {
             e.printStackTrace();
             return null;
         }
@@ -100,6 +110,79 @@ public class Sha_3 {
         byte[] c = (new BigInteger(KMACXOF256(ke, EMPTY_STRING_BYTES, thePaddedString.length, SKE_BYTES)).xor(new BigInteger(thePaddedString))).toByteArray();
         byte[] t = KMACXOF256(ka, thePaddedString, FIVE_TWELVE, SKA_BYTES);
         return new SymmetricCryptogram(z, c, t);
+    }
+
+    public static KeyPair dhiesKeyPair(String pw) {
+        BigInteger s = new BigInteger(KMACXOF256(pw.getBytes(), EMPTY_STRING_BYTES, FIVE_TWELVE, SK_BYTES)).multiply(FOUR); // s <- KMACXOF256(pw, “”, 512, “SK”); s <- 4s
+        Point V = G.scalarMultiply(s); // V <- s*G
+        return new KeyPair(s, V); // (s, V)
+    }
+
+    public static SymmetricCryptogram dhiesEncrypt(File theFile, Point V) {
+        try {
+            return dhiesEncrypt(new String(Files.readAllBytes(Paths.get(theFile.getPath()))), V);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public static SymmetricCryptogram dhiesEncrypt(String theString, Point V) {
+        byte[] m = theString.getBytes();
+        BigInteger k = BigInteger.valueOf(myRandom.nextInt(FIVE_TWELVE)).multiply(FOUR); // k <- Random(512); k <- 4k
+        Point W = V.scalarMultiply(k); // W <- k*V;
+        Point Z = G.scalarMultiply(k); // Z <- k*G
+        byte[] kake = KMACXOF256(W.getX().toByteArray(), EMPTY_STRING_BYTES, TEN_TWENTYFOUR, PK_BYTES); // (ka || ke) <- KMACXOF256(Wx, “”, 1024, “PK”)
+        byte[] ka = Arrays.copyOfRange(kake, 0, kake.length / 2);
+        byte[] ke = Arrays.copyOfRange(kake, kake.length / 2, kake.length);
+        byte[] c = (new BigInteger(KMACXOF256(ke, EMPTY_STRING_BYTES, m.length, PKE_BYTES))).xor(new BigInteger(m)).toByteArray(); // c <- KMACXOF256(ke, “”, |m|, “PKE”) xor m
+        byte[] t = KMACXOF256(ka, m, FIVE_TWELVE, PKA_BYTES); // t <- KMACXOF256(ka, m, 512, “PKA”)
+        return new SymmetricCryptogram(Z, c, t); // (Z, c, t)
+    }
+
+    public static String dhiesDecrypt(SymmetricCryptogram theCryptogram, String pw) {
+        BigInteger s = new BigInteger(KMACXOF256(pw.getBytes(), EMPTY_STRING_BYTES, FIVE_TWELVE, SK_BYTES)).multiply(FOUR); // s <- KMACXOF256(pw, “”, 512, “SK”); s <- 4s
+        Point W = theCryptogram.getZPoint().scalarMultiply(s); // W <- s*Z
+        byte[] kake = KMACXOF256(W.getX().toByteArray(), EMPTY_STRING_BYTES, TEN_TWENTYFOUR, PK_BYTES); // (ka || ke) <- KMACXOF256(Wx, “”, 1024, “PK”)
+        byte[] ka = Arrays.copyOfRange(kake, 0, kake.length / 2);
+        byte[] ke = Arrays.copyOfRange(kake, kake.length / 2, kake.length);
+        byte[] m = (new BigInteger(KMACXOF256(ke, EMPTY_STRING_BYTES, theCryptogram.getC().length, PKE_BYTES))).xor(new BigInteger(theCryptogram.getC())).toByteArray(); // m <- KMACXOF256(ke, “”, |c|, “PKE”) xor c
+        byte[] t = KMACXOF256(ka, m, FIVE_TWELVE, PKA_BYTES); // t’ <- KMACXOF256(ka, m, 512, “PKA”)
+        return Arrays.equals(t, theCryptogram.getT()) ? new String(m).replaceAll("\0", "") : "UNACCEPTED"; // accept if, and only if, t’ = t
+    }
+
+    public static Signature dhiesSign(File theFile, String pw) {
+        try {
+            return dhiesSign(new String(Files.readAllBytes(Paths.get(theFile.getPath()))), pw);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public static Signature dhiesSign(String theString, String pw) {
+        byte[] m = theString.getBytes();
+        BigInteger s = new BigInteger(KMACXOF256(pw.getBytes(), EMPTY_STRING_BYTES, FIVE_TWELVE, SK_BYTES)).multiply(FOUR); // s <- KMACXOF256(pw, “”, 512, “SK”); s <- 4s
+        BigInteger k = new BigInteger(KMACXOF256(s.toByteArray(), m, FIVE_TWELVE, N_BYTES)).multiply(FOUR); // k <- KMACXOF256(s, m, 512, “N”); k <- 4k
+        Point U = G.scalarMultiply(k); // U <- k*G
+        BigInteger h = new BigInteger(KMACXOF256(U.getX().toByteArray(), m, FIVE_TWELVE, T_BYTES)); // h <- KMACXOF256(Ux, m, 512, “T”)
+        BigInteger z = k.subtract(h.multiply(s)).mod(r); // z  (k – hs) mod r
+        return new Signature(h, z); // (h, z)
+    }
+
+    public static boolean dhiesVerify(Signature theSignature, File theFile, Point V) {
+        try {
+            return dhiesVerify(theSignature, new String(Files.readAllBytes(Paths.get(theFile.getPath()))), V);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public static boolean dhiesVerify(Signature theSignature, String theString, Point V) {
+        byte[] m = theString.getBytes();
+        Point U = G.scalarMultiply(theSignature.getZ()).add(V.scalarMultiply(theSignature.getH()));
+        return new BigInteger(KMACXOF256(U.getX().toByteArray(), m, FIVE_TWELVE, T_BYTES)).equals(theSignature.getH());
     }
 
     public static String decrypt(SymmetricCryptogram theCryptogram, String pw) {
@@ -259,7 +342,7 @@ public class Sha_3 {
             baos.write(theHost);
             baos.write(theBytesToAppend);
             return baos.toByteArray();
-        } catch(IOException e) {
+        } catch (IOException e) {
             e.printStackTrace();
             return null;
         }
@@ -271,24 +354,16 @@ public class Sha_3 {
             baos.write(theHost);
             baos.write(theByteToAppend);
             return baos.toByteArray();
-        } catch(IOException e) {
+        } catch (IOException e) {
             e.printStackTrace();
             return null;
         }
     }
 
     private static byte[] padBytes(byte[] theBytes) {
-        while(theBytes.length % REQUIRED_BYTE_MULTIPLE != 0) {
-            theBytes = append(theBytes, (byte)0);
+        while (theBytes.length % REQUIRED_BYTE_MULTIPLE != 0) {
+            theBytes = append(theBytes, (byte) 0);
         }
         return theBytes;
-    }
-
-
-    private static void print(byte[] bytes) {
-        for (byte b : bytes) {
-            System.out.print(b);
-        }
-        System.out.println();
     }
 }
