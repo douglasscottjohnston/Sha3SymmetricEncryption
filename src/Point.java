@@ -2,7 +2,6 @@ import java.math.BigInteger;
 
 public final class Point {
     public static final BigInteger p = BigInteger.TWO.pow(448).subtract(BigInteger.TWO.pow(224)).subtract(BigInteger.ONE);
-    public static final BigInteger negative_d = BigInteger.valueOf(39081);
     private static final BigInteger d = BigInteger.valueOf(-39081);
     private static final Point NEUTRAL_ELEMENT_OF_ADDITION = new Point(BigInteger.ZERO, BigInteger.ONE);
     private final BigInteger myX;
@@ -26,6 +25,12 @@ public final class Point {
         return false;
     }
 
+    /**
+     * Uses the Edwards point addition formula to add two points together and returns the resulting point
+     *
+     * @param p2 The second point to add
+     * @return The result of the addition
+     */
     public Point add(Point p2) {
         if (p2.equals(this.negative())) return NEUTRAL_ELEMENT_OF_ADDITION;
         if (p2.equals(NEUTRAL_ELEMENT_OF_ADDITION)) return this;
@@ -72,8 +77,14 @@ public final class Point {
         return P; // P = s * G
     }
 
+    /**
+     * Given an x, returns a point (x, y) where y is the result of the equation:
+     * y = sqrt((1-x^2)/(1+39081x^2)mod p)
+     *
+     * @param theX the x to use in the point
+     * @return The resulting point
+     */
     public static Point fromLeastSignificantBit(BigInteger theX) {
-        // TODO: idk about this
         return new Point(
                 theX,
                 // sqrt( (1 - x^2) / (1 + 39081 * x^2) mod p)

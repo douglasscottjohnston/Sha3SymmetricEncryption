@@ -30,6 +30,7 @@ public class Sha_3 {
     private static final BigInteger r = BigInteger.TWO.pow(446).subtract(new BigInteger(
             "13818066809895115352007386748515426880336692474882178609894547503885"
     ));
+    private static final Point G = Point.fromLeastSignificantBit(BigInteger.valueOf(8)); // (x_0, y_0)
 
     private static final int ROUNDS = 24;
 
@@ -55,7 +56,6 @@ public class Sha_3 {
     };
 
     private static final SecureRandom myRandom = new SecureRandom();
-    private static final Point G = Point.fromLeastSignificantBit(BigInteger.valueOf(8));
 
     Sha_3() {
 
@@ -181,7 +181,7 @@ public class Sha_3 {
 
     public static boolean dhiesVerify(Signature theSignature, String theString, Point V) {
         byte[] m = theString.getBytes();
-        Point U = G.scalarMultiply(theSignature.getZ()).add(V.scalarMultiply(theSignature.getH()));
+        Point U = G.scalarMultiply(theSignature.getZ()).add(V.scalarMultiply(theSignature.getH())); // U <- z*G + h*V
         return new BigInteger(KMACXOF256(U.getX().toByteArray(), m, FIVE_TWELVE, T_BYTES)).equals(theSignature.getH());
     }
 
