@@ -20,7 +20,7 @@ private keys to a file.
 Command structure: {input file path with name} -PKF {public key file path with name}\
 Description: Encrypts a data file under a given elliptic public key file and writes the ciphertext to
 a file.
-##### PUBLIC KEY FILE REQUIREMENTS: This command assumes that the public key is represented by a point (x, y). X should be on the first line in the public key file and y should be on the second line.\
+##### PUBLIC KEY FILE REQUIREMENTS: This command assumes that the public key is represented by a point (x, y). X should be on the first line in the public key file and y should be on the second line.
 Public key file example:\
 132132dasf1231 (This line is X)\
 1325adsf113asdf (This line is Y)
@@ -50,4 +50,4 @@ Asdfadsfad44654 (This line is z)\
 PUBLIC KEY FILE REQUIREMENTS: This command assumes that the public key is represented by a point (x, y). X should be on the first line in the public key file and y should be on the second line.\
 Public key file example:\
 132132dasf1231 (This line is X)\
-1325adsf113asdf (This line is Y)\
+1325adsf113asdf (This line is Y)
