@@ -1,4 +1,4 @@
-# Sha_3_Symmetric_Encryption
+# Sha-3 Symmetric Encryption
 I made This class project for the University of Washington, Tacoma TCSS 487 Cryptography.
 
 ## Description
